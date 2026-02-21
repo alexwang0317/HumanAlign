@@ -1,3 +1,4 @@
-# Important Messages — new_human_and_model
+# Important messages for new_human_and_model
 # Format: YYYY-MM-DD HH:MM | <@user_id> | slack_permalink | category | summary
-# Categories: decision, blocker, milestone, pivot, escalation
+2026-02-21 14:34 | <@U0AGAKQ1V54> | https://slack.com/archives/C0AGGBJGCJY/p1771713251804859 | pivot | Hey <@U0AGAKQ1V54>, is the team officially deciding to switch back to SQLite, or is this still just being considered? Want to make sure the ground truth stays accurate before logging any changes.
+2026-02-21 14:34 | <@U0AGAKQ1V54> | https://slack.com/archives/C0AGGBJGCJY/p1771713275861409 | pivot | Switched back to SQLite; **alexwang0317** (<@U0AGAKQ1V54>) remains responsible for database & infrastructure.

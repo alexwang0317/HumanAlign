@@ -1,1 +1,14 @@
-The team's stated higher goal is to launch the MVP by Friday.
+# Project Ground Truth
+
+## Core Objective
+(Set your team's objective here)
+
+## Directory & Responsibilities
+* **alexwang0317** (<@U0AGAKQ1V54>) — Database &amp; Infrastructure. Owns schema design and
+  migrations.
+  migrations.
+* **Erik** (<@U0AGAN34DD4>)
+
+## AI Decision Log
+* **2026-02-21:** Switched to PostgreSQL; **alexwang0317** (<@U0AGAKQ1V54>) is responsible for PostgreSQL. (approved by <@U0AGAKQ1V54>)
+* **2026-02-21:** Switched back to SQLite; **alexwang0317** (<@U0AGAKQ1V54>) remains responsible for database & infrastructure. (approved by <@U0AGAKQ1V54>)
