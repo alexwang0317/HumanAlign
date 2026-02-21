@@ -115,7 +115,7 @@ def handle_app_mention(event: dict, client, say) -> None:
     if user_message.lower().startswith("dashboard"):
         say(":chart_with_upwards_trend: Deploying dashboard...", thread_ts=thread_ts)
         try:
-            url = deploy()
+            url = deploy(channel_name)
             say(f":white_check_mark: Dashboard deployed: {url}", thread_ts=thread_ts)
         except Exception as e:
             log.error("Dashboard deploy failed: %s", e)

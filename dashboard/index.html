@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HumanAnd Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Urbanist', sans-serif; background: #f6f8fa; color: #1f2328; line-height: 1.6; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    .subtitle { color: #656d76; margin-bottom: 32px; }
+    h2 { font-size: 18px; margin-bottom: 16px; color: #1f2328; border-bottom: 1px solid #d0d7de; padding-bottom: 8px; }
+    .section { margin-bottom: 40px; }
+
+    /* Stats cards */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 32px; }
+    .stat-card { background: #ffffff; border: none; border-radius: 8px; padding: 16px; text-align: center; }
+    .stat-value { font-size: 28px; font-weight: 700; color: #0969da; }
+    .stat-label { font-size: 12px; color: #656d76; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Chart */
+    .chart-container { background: #ffffff; border: none; border-radius: 8px; padding: 16px; margin-bottom: 32px; max-height: 280px; }
+
+    /* Timeline & event lists */
+    .event-list { list-style: none; }
+    .event-item { background: #ffffff; border: none; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; display: flex; gap: 12px; align-items: flex-start; }
+    .event-meta { flex-shrink: 0; min-width: 130px; }
+    .event-time { font-size: 12px; color: #656d76; font-family: monospace; }
+    .event-content { flex: 1; }
+    .event-summary { font-size: 14px; }
+    .event-link { font-size: 12px; margin-top: 4px; }
+    .event-link a { color: #0969da; text-decoration: none; }
+    .event-link a:hover { text-decoration: underline; }
+
+    /* Badges */
+    .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.3px; }
+    .badge-decision { background: #dafbe1; color: #116329; }
+    .badge-blocker { background: #ffebe9; color: #82071e; }
+    .badge-milestone { background: #fbefff; color: #6639ba; }
+    .badge-pivot { background: #fff8c5; color: #7d4e00; }
+    .badge-escalation { background: #ffebe9; color: #99286e; }
+    .badge-general { background: #ddf4ff; color: #0969da; }
+
+    /* Reaction badges */
+    .reaction { font-size: 11px; margin-left: 8px; }
+    .reaction-approved { color: #1a7f37; }
+    .reaction-rejected { color: #cf222e; }
+    .reaction-pending { color: #656d76; }
+
+    /* Type badges */
+    .type-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-right: 6px; }
+    .type-UPDATE { background: #dafbe1; color: #116329; }
+    .type-MISALIGN { background: #fff8c5; color: #7d4e00; }
+    .type-QUESTION { background: #ddf4ff; color: #0969da; }
+    .type-ROUTE { background: #fbefff; color: #6639ba; }
+
+    .filter-bar { margin-bottom: 24px; }
+    .filter-bar select { font-family: inherit; font-size: 14px; padding: 6px 12px; border: none; border-radius: 6px; background: #ffffff; color: #1f2328; cursor: pointer; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px; }
+    .two-col .section { margin-bottom: 0; }
+    @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+
+    .empty { color: #656d76; font-style: italic; padding: 24px; text-align: center; }
+    .project-name { font-size: 12px; color: #656d76; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>HumanAnd Dashboard</h1>
+    <p class="subtitle" id="subtitle">Bot activity</p>
+
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <div class="section">
+      <h2>Activity (Last 7 Days)</h2>
+      <div class="chart-container">
+        <canvas id="activity-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <label for="category-filter">Filter by category: </label>
+      <select id="category-filter">
+        <option value="all">All</option>
+        <option value="decision">Decision</option>
+        <option value="blocker">Blocker</option>
+        <option value="milestone">Milestone</option>
+        <option value="pivot">Pivot</option>
+        <option value="escalation">Escalation</option>
+      </select>
+    </div>
+
+    <div class="two-col">
+      <div class="section">
+        <h2>Project Timeline</h2>
+        <ul class="event-list" id="timeline-list"></ul>
+      </div>
+
+      <div class="section">
+        <h2>Ground Truth Changes</h2>
+        <ul class="event-list" id="changes-list"></ul>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Misalignment Flags &amp; Nudges</h2>
+      <ul class="event-list" id="misalignments-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    const DATA_DIR = 'data';
+    let _timeline = [], _changes = [], _misalignments = [];
+
+    async function fetchJSON(file) {
+      try {
+        const resp = await fetch(`${DATA_DIR}/${file}`);
+        if (!resp.ok) return null;
+        return resp.json();
+      } catch { return null; }
+    }
+
+    function badgeHTML(category) {
+      const cls = `badge badge-${category || 'general'}`;
+      return `<span class="${cls}">${category || 'general'}</span>`;
+    }
+
+    function reactionHTML(reaction) {
+      if (!reaction) return '<span class="reaction reaction-pending">pending</span>';
+      const cls = reaction === 'approved' ? 'reaction-approved' : 'reaction-rejected';
+      const icon = reaction === 'approved' ? '\u2705' : '\u274c';
+      return `<span class="reaction ${cls}">${icon} ${reaction}</span>`;
+    }
+
+    function renderStats(stats) {
+      const grid = document.getElementById('stats-grid');
+      if (!stats || Object.keys(stats).length === 0) {
+        grid.innerHTML = '<div class="empty">No data yet</div>';
+        return;
+      }
+      let totalEvents = 0, totalApproved = 0, totalReacted = 0;
+      const byType = {};
+      for (const [, s] of Object.entries(stats)) {
+        totalEvents += s.total_events;
+        totalApproved += s.total_approved;
+        totalReacted += s.total_with_reaction;
+        for (const [t, c] of Object.entries(s.by_type || {})) {
+          byType[t] = (byType[t] || 0) + c;
+        }
+      }
+      const rate = totalReacted > 0 ? Math.round(totalApproved / totalReacted * 100) : 0;
+      const cards = [
+        { value: totalEvents, label: 'Total Events' },
+        { value: byType['UPDATE'] || 0, label: 'Updates' },
+        { value: byType['MISALIGN'] || 0, label: 'Misalignments' },
+        { value: byType['QUESTION'] || 0, label: 'Nudges' },
+        { value: byType['ROUTE'] || 0, label: 'Routes' },
+        { value: `${rate}%`, label: 'Approval Rate' },
+      ];
+      grid.innerHTML = cards.map(c =>
+        `<div class="stat-card"><div class="stat-value">${c.value}</div><div class="stat-label">${c.label}</div></div>`
+      ).join('');
+    }
+
+    function renderChart(stats) {
+      if (!stats || Object.keys(stats).length === 0) return;
+      const dayMap = {};
+      for (const [, s] of Object.entries(stats)) {
+        for (const [day, count] of Object.entries(s.by_day || {})) {
+          dayMap[day] = (dayMap[day] || 0) + count;
+        }
+      }
+      // Fill last 7 days
+      const days = [];
+      const now = new Date();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        days.push(d.toISOString().slice(0, 10));
+      }
+      const counts = days.map(d => dayMap[d] || 0);
+
+      new Chart(document.getElementById('activity-chart'), {
+        type: 'line',
+        data: {
+          labels: days.map(d => d.slice(5)),
+          datasets: [{
+            label: 'Events',
+            data: counts,
+            borderColor: '#0969da',
+            backgroundColor: 'rgba(9, 105, 218, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointBackgroundColor: '#0969da',
+            pointRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#656d76' }, grid: { display: false } },
+            y: { ticks: { color: '#656d76', stepSize: 1 }, grid: { color: '#d0d7de' }, beginAtZero: true },
+          }
+        }
+      });
+    }
+
+    function renderTimeline(timeline) {
+      const list = document.getElementById('timeline-list');
+      if (!timeline || timeline.length === 0) {
+        list.innerHTML = '<li class="empty">No timeline entries yet</li>';
+        return;
+      }
+      // Show newest first
+      const sorted = [...timeline].reverse();
+      list.innerHTML = sorted.map(e => `
+        <li class="event-item">
+          <div class="event-meta">
+            <div class="event-time">${e.timestamp}</div>
+            <div class="project-name">${e.project}</div>
+          </div>
+          <div class="event-content">
+            ${badgeHTML(e.category)}
+            <span class="event-summary">${escapeHTML(e.summary)}</span>
+            <div class="event-link"><a href="${e.permalink}" target="_blank">View in Slack &rarr;</a></div>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    function renderChanges(changes) {
+      const list = document.getElementById('changes-list');
+      if (!changes || changes.length === 0) {
+        list.innerHTML = '<li class="empty">No ground truth changes yet</li>';
+        return;
+      }
+      list.innerHTML = changes.map(e => `
+        <li class="event-item">
+          <div class="event-meta">
+            <div class="event-time">${e.timestamp}</div>
+            <div class="project-name">${e.project}</div>
+          </div>
+          <div class="event-content">
+            <span class="type-badge type-UPDATE">UPDATE</span>
+            ${badgeHTML(e.category)}
+            ${reactionHTML(e.reaction)}
+            <div class="event-summary">${escapeHTML(e.content)}</div>
+            <div class="event-link"><a href="${e.permalink}" target="_blank">View in Slack &rarr;</a></div>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    function renderMisalignments(items) {
+      const list = document.getElementById('misalignments-list');
+      if (!items || items.length === 0) {
+        list.innerHTML = '<li class="empty">No misalignment flags or nudges yet</li>';
+        return;
+      }
+      list.innerHTML = items.map(e => `
+        <li class="event-item">
+          <div class="event-meta">
+            <div class="event-time">${e.timestamp}</div>
+            <div class="project-name">${e.project}</div>
+          </div>
+          <div class="event-content">
+            <span class="type-badge type-${e.event_type}">${e.event_type}</span>
+            ${badgeHTML(e.category)}
+            ${reactionHTML(e.reaction)}
+            <div class="event-summary">${escapeHTML(e.content)}</div>
+            <div class="event-link"><a href="${e.permalink}" target="_blank">View in Slack &rarr;</a></div>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    function escapeHTML(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    async function init() {
+      const [meta, timeline, changes, misalignments, stats] = await Promise.all([
+        fetchJSON('meta.json'),
+        fetchJSON('timeline.json'),
+        fetchJSON('changes.json'),
+        fetchJSON('misalignments.json'),
+        fetchJSON('stats.json'),
+      ]);
+      if (meta && meta.project) {
+        document.getElementById('subtitle').textContent = `Project: ${meta.project}`;
+      }
+      _timeline = timeline || [];
+      _changes = changes || [];
+      _misalignments = misalignments || [];
+
+      renderStats(stats);
+      renderChart(stats);
+      applyFilter();
+
+      document.getElementById('category-filter').addEventListener('change', applyFilter);
+    }
+
+    function applyFilter() {
+      const cat = document.getElementById('category-filter').value;
+      const filter = items => cat === 'all' ? items : items.filter(e => e.category === cat);
+      renderTimeline(filter(_timeline));
+      renderChanges(filter(_changes));
+      renderMisalignments(filter(_misalignments));
+    }
+
+    init();
+  </script>
+</body>
+</html>

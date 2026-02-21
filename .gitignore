@@ -1,6 +1,9 @@
 claude.md
 ideas.md
+demo.md
 .env
 .venv/
 __pycache__/
 *.db
+.wrangler/
+dashboard/data/

@@ -1,3 +1,4 @@
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -8,6 +9,7 @@ from bot import register_handlers
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
     load_dotenv()
     app = create_app()
     register_handlers(app)
