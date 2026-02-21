@@ -457,7 +457,7 @@ Bot watches PRs and checks if the work matches the author's role in the Director
 **How it works:**
 1. **GitHub webhook** — fires on PR opened. Bot receives the PR title, commit messages, and author.
 2. **Look up the author** — map GitHub username to a Directory entry in `ground_truth.txt` to get their ownership area.
-3. **One Haiku call** — send the commit messages + the author's ownership area. Prompt: "This person owns [area]. Based on these commit messages, does this PR match their role? PASS or NUDGE + one-line reason."
+3. **One Sonnet call** — send the commit messages + the author's ownership area. Prompt: "This person owns [area]. Based on these commit messages, does this PR match their role? PASS or NUDGE + one-line reason."
 4. **PASS** — do nothing.
 5. **NUDGE** — post to Slack:
    > "Alex opened PR #42 `Redesign navbar component` — Alex owns Database & Infrastructure. Should this go to Sarah (Frontend & UI)?"

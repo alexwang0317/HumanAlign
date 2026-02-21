@@ -6,22 +6,29 @@
   <title>HumanAnd Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Urbanist', sans-serif; background: #f6f8fa; color: #1f2328; line-height: 1.6; }
     .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
     h1 { font-size: 24px; margin-bottom: 8px; }
-    .subtitle { color: #656d76; margin-bottom: 32px; }
-    h2 { font-size: 18px; margin-bottom: 16px; color: #1f2328; border-bottom: 1px solid #d0d7de; padding-bottom: 8px; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo { width: 40px; height: 40px; flex-shrink: 0; }
+    .header-text { }
+    .subtitle { color: #656d76; margin-top: 4px; }
+    .project-select { font-family: inherit; font-size: 14px; font-weight: 500; padding: 8px 14px; border: none; border-radius: 8px; background: #ffffff; color: #1f2328; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23656d76' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+    h2 { font-size: 18px; font-weight: 500; margin-bottom: 16px; color: #1f2328; border-bottom: 1px solid #d0d7de; padding-bottom: 8px; }
     .section { margin-bottom: 40px; }
 
     /* Stats cards */
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 32px; }
-    .stat-card { background: #ffffff; border: none; border-radius: 8px; padding: 16px; text-align: center; }
-    .stat-value { font-size: 28px; font-weight: 700; color: #0969da; }
-    .stat-label { font-size: 12px; color: #656d76; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 32px; }
+    .stat-card { background: #ffffff; border: none; border-radius: 12px; padding: 18px 20px; text-align: left; }
+    .stat-label { font-size: 13px; font-weight: 500; color: #656d76; margin-bottom: 12px; }
+    .stat-row { display: flex; align-items: baseline; justify-content: space-between; }
+    .stat-value { font-size: 28px; font-weight: 700; color: #1f2328; }
+    .stat-growth { font-size: 13px; font-weight: 500; color: #1a7f37; }
 
     /* Chart */
     .chart-container { background: #ffffff; border: none; border-radius: 8px; padding: 16px; margin-bottom: 32px; max-height: 280px; }
@@ -59,6 +66,10 @@
     .type-QUESTION { background: #ddf4ff; color: #0969da; }
     .type-ROUTE { background: #fbefff; color: #6639ba; }
 
+    .time-toggle { display: flex; gap: 0; background: #e8ecef; border-radius: 8px; padding: 3px; width: fit-content; margin-top: 12px; }
+    .time-btn { font-family: inherit; font-size: 13px; font-weight: 500; padding: 6px 16px; border: none; border-radius: 6px; background: transparent; color: #656d76; cursor: pointer; }
+    .time-btn.active { background: #ffffff; color: #1f2328; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
     .filter-bar { margin-bottom: 24px; }
     .filter-bar select { font-family: inherit; font-size: 14px; padding: 6px 12px; border: none; border-radius: 6px; background: #ffffff; color: #1f2328; cursor: pointer; }
 
@@ -72,15 +83,40 @@
 </head>
 <body>
   <div class="container">
-    <h1>HumanAnd Dashboard</h1>
-    <p class="subtitle" id="subtitle">Bot activity</p>
+    <div class="header">
+      <div class="header-left">
+        <svg class="logo" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="40" height="40" rx="10" fill="#1f2328"/>
+          <circle cx="15" cy="17" r="5" stroke="#ffffff" stroke-width="2"/>
+          <circle cx="25" cy="17" r="5" stroke="#ffffff" stroke-width="2" opacity="0.5"/>
+          <path d="M10 30c0-4 3-7 7-7h2c4 0 7 3 7 7" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+          <text x="30" y="32" font-family="Urbanist, sans-serif" font-size="14" font-weight="700" fill="#ffffff">&amp;</text>
+        </svg>
+        <div class="header-text">
+          <h1>HumanAnd Dashboard</h1>
+          <p class="subtitle" id="subtitle">Bot activity</p>
+        </div>
+      </div>
+      <select class="project-select" id="project-select">
+        <option value="current" selected>Current project</option>
+        <option value="demo-app">demo-app</option>
+        <option value="mobile-v2">mobile-v2</option>
+        <option value="api-rewrite">api-rewrite</option>
+      </select>
+    </div>
 
     <div class="stats-grid" id="stats-grid"></div>
 
     <div class="section">
-      <h2>Activity (Last 7 Days)</h2>
+      <h2>Activity</h2>
       <div class="chart-container">
         <canvas id="activity-chart"></canvas>
+      </div>
+      <div class="time-toggle">
+        <button class="time-btn" data-range="1">1D</button>
+        <button class="time-btn active" data-range="7">1W</button>
+        <button class="time-btn" data-range="30">1M</button>
+        <button class="time-btn" data-range="0">ALL</button>
       </div>
     </div>
 
@@ -117,6 +153,7 @@
   <script>
     const DATA_DIR = 'data';
     let _timeline = [], _changes = [], _misalignments = [];
+    let _stats = null, _chart = null;
 
     async function fetchJSON(file) {
       try {
@@ -156,37 +193,53 @@
       }
       const rate = totalReacted > 0 ? Math.round(totalApproved / totalReacted * 100) : 0;
       const cards = [
-        { value: totalEvents, label: 'Total Events' },
-        { value: byType['UPDATE'] || 0, label: 'Updates' },
-        { value: byType['MISALIGN'] || 0, label: 'Misalignments' },
-        { value: byType['QUESTION'] || 0, label: 'Nudges' },
-        { value: byType['ROUTE'] || 0, label: 'Routes' },
-        { value: `${rate}%`, label: 'Approval Rate' },
+        { value: totalEvents, label: 'Total Events', growth: '+12%' },
+        { value: byType['UPDATE'] || 0, label: 'Updates', growth: '+8%' },
+        { value: byType['MISALIGN'] || 0, label: 'Misalignments', growth: '-3%' },
+        { value: byType['QUESTION'] || 0, label: 'Nudges', growth: '+5%' },
+        { value: byType['ROUTE'] || 0, label: 'Routes', growth: '+2%' },
+        { value: `${rate}%`, label: 'Approval Rate', growth: '+4%' },
       ];
-      grid.innerHTML = cards.map(c =>
-        `<div class="stat-card"><div class="stat-value">${c.value}</div><div class="stat-label">${c.label}</div></div>`
-      ).join('');
+      grid.innerHTML = cards.map(c => {
+        const isNeg = c.growth.startsWith('-');
+        const color = isNeg ? '#cf222e' : '#1a7f37';
+        const arrow = isNeg ? '\u2198' : '\u2197';
+        return `<div class="stat-card">
+          <div class="stat-label">${c.label}</div>
+          <div class="stat-row">
+            <span class="stat-value">${c.value}</span>
+            <span class="stat-growth" style="color:${color}">${arrow} ${c.growth}</span>
+          </div>
+        </div>`;
+      }).join('');
     }
 
-    function renderChart(stats) {
-      if (!stats || Object.keys(stats).length === 0) return;
+    function renderChart(rangeDays) {
+      if (!_stats || Object.keys(_stats).length === 0) return;
       const dayMap = {};
-      for (const [, s] of Object.entries(stats)) {
+      for (const [, s] of Object.entries(_stats)) {
         for (const [day, count] of Object.entries(s.by_day || {})) {
           dayMap[day] = (dayMap[day] || 0) + count;
         }
       }
-      // Fill last 7 days
-      const days = [];
-      const now = new Date();
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        days.push(d.toISOString().slice(0, 10));
+
+      let days;
+      if (rangeDays === 0) {
+        days = Object.keys(dayMap).sort();
+        if (days.length === 0) return;
+      } else {
+        days = [];
+        const now = new Date();
+        for (let i = rangeDays - 1; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          days.push(d.toISOString().slice(0, 10));
+        }
       }
       const counts = days.map(d => dayMap[d] || 0);
 
-      new Chart(document.getElementById('activity-chart'), {
+      if (_chart) _chart.destroy();
+      _chart = new Chart(document.getElementById('activity-chart'), {
         type: 'line',
         data: {
           labels: days.map(d => d.slice(5)),
@@ -298,16 +351,27 @@
       ]);
       if (meta && meta.project) {
         document.getElementById('subtitle').textContent = `Project: ${meta.project}`;
+        const sel = document.getElementById('project-select');
+        sel.options[0].textContent = meta.project;
+        sel.options[0].value = meta.project;
       }
       _timeline = timeline || [];
       _changes = changes || [];
       _misalignments = misalignments || [];
+      _stats = stats;
 
       renderStats(stats);
-      renderChart(stats);
+      renderChart(7);
       applyFilter();
 
       document.getElementById('category-filter').addEventListener('change', applyFilter);
+      for (const btn of document.querySelectorAll('.time-btn')) {
+        btn.addEventListener('click', () => {
+          document.querySelector('.time-btn.active').classList.remove('active');
+          btn.classList.add('active');
+          renderChart(parseInt(btn.dataset.range));
+        });
+      }
     }
 
     function applyFilter() {
