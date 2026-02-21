@@ -49,7 +49,7 @@ Goal: Bot reads the ground truth file and uses it to detect misalignment and rou
 
 ### Ground Truth Format
 
-Ground truth files use structured plaintext with Slack user IDs so the bot can actually ping people. Example `projects/new_human_and_model.txt`:
+Ground truth files use structured plaintext with Slack user IDs so the bot can actually ping people. Example `projects/new_human_and_model/ground_truth.txt`:
 
 ```markdown
 # Project Ground Truth
@@ -58,17 +58,43 @@ Ground truth files use structured plaintext with Slack user IDs so the bot can a
 Launch the MVP by Friday with zero new database dependencies.
 
 ## Directory & Responsibilities
-* **Database & Infrastructure:** Alex (<@U11111111>)
-* **Frontend & UI:** Sarah (<@U22222222>)
-* **Product & Timelines:** Manager Dan (<@U33333333>)
+* **Alex** (<@U11111111>) — Database & Infrastructure. Owns schema design, migrations, and deployment pipeline. Go-to for anything backend data.
+* **Sarah** (<@U22222222>) — Frontend & UI. Owns React components, design system, and user-facing features. Go-to for anything the user sees.
+* **Manager Dan** (<@U33333333>) — Product & Timelines. Owns sprint planning, stakeholder updates, and scope decisions. Go-to for priority calls and deadline questions.
 
 ## AI Decision Log
 * **2026-02-21:** Team agreed to pivot to MongoDB. (Accepted — proposed by bot after #backend discussion)
 ```
 
-The **Directory** section is critical — it maps people to ownership areas using their real Slack user IDs (find via profile -> three dots -> "Copy member ID"). This is what powers the routing system.
+The **Directory** section is critical — it maps people to ownership areas using their real Slack user IDs (find via profile -> three dots -> "Copy member ID"). Each entry should include:
+- Name and Slack user ID (so the bot can ping them)
+- Their role/title
+- What they own (specific areas of responsibility)
+- When to route to them (what kinds of questions they handle)
+
+This is what powers the routing system. The richer the role descriptions, the better the bot can match questions to the right person.
 
 The **AI Decision Log** is where accepted ground truth changes get appended, with timestamps and context.
+
+### Messages Timeline Format
+
+Each project's `messages.txt` is a chronological log of important messages. The bot appends to this file whenever it detects a significant moment — a decision, a blocker, a milestone, a pivot, or an escalation.
+
+Format:
+```
+YYYY-MM-DD HH:MM | <@user_id> | slack_permalink | category | summary
+```
+
+Categories: `decision`, `blocker`, `milestone`, `pivot`, `escalation`
+
+Example:
+```
+2026-02-21 14:30 | <@U11111111> | https://workspace.slack.com/archives/C1/p123 | decision | Team agreed to drop Redis and use SQLite
+2026-02-21 15:45 | <@U22222222> | https://workspace.slack.com/archives/C1/p456 | blocker | Frontend blocked on auth API — no endpoint yet
+2026-02-22 09:00 | <@U33333333> | https://workspace.slack.com/archives/C1/p789 | milestone | MVP demo deployed to staging
+```
+
+This file is append-only and designed to be visualized later as a project timeline (in the dashboard or exported).
 
 ### Ground Truth Size Limit
 
@@ -126,8 +152,11 @@ Goal: Ground truth evolves based on what's happening in Slack.
 - [ ] Bot proposes an edit to the ground truth file directly in Slack — posts the suggested change with a short explanation of *why* it's proposing the update
 - [ ] Any user in the channel can respond to approve or reject — any affirmative ("Y", "yes", "yeah", "sure", thumbs-up react) counts as acceptance, any negative ("N", "no", "nah") counts as rejection
 - [ ] On acceptance: bot writes the change to the channel's ground truth file and appends a changelog entry (date, what changed, why)
+- [ ] Bot appends important messages to `messages.txt` — whenever it detects a decision, blocker, milestone, pivot, or escalation, it logs the timestamp, user, Slack permalink, category, and a one-line summary
 - [ ] On rejection: bot acknowledges and moves on
 - [ ] Bot re-reads ground truth after every accepted change (no restart needed)
+- [ ] When ground truth is updated with Directory changes, validate that all listed Slack user IDs are actually members of the channel (`conversations.members` API). If someone is listed but not in the channel, the bot warns: "Heads up — <@U12345> is listed in the Directory but isn't in this channel."
+- [ ] The `ground_truth_update.md` prompt should instruct the LLM to include role details (name, Slack ID, what they own, when to route to them) when proposing Directory additions — not just bare names
 - [ ] After each accepted update, check word count against `MAX_GROUND_TRUTH_WORDS` (hardcoded in `ground_truth.py`). If over the limit, trigger compaction — summarize older entries, preserve Directory and Core Objective, propose the compacted version for Y/N approval.
 - [ ] **Checkpoint:** Bot notices a goal shift in conversation, proposes a ground truth update, user approves, ground truth file is updated.
 
@@ -140,7 +169,8 @@ Goal: Track what the bot is doing so humans can review its behavior over time.
   - Recent misalignment flags (last 7 days) with context
   - Ground truth change history (what changed, when, why, who approved)
   - Per-channel activity summary (how often the bot speaks up, acceptance rate)
-- [ ] **Checkpoint:** Run the bot for a day, then pull up the dashboard and see a clear picture of what it flagged, what changed, and how the team responded.
+  - **Project timeline** — visual chronological view of important messages from `messages.txt` (decisions, blockers, milestones, pivots, escalations) with clickable Slack permalinks
+- [ ] **Checkpoint:** Run the bot for a day, then pull up the dashboard and see a clear picture of what it flagged, what changed, and how the team responded. The timeline shows the project's story at a glance.
 
 ### SQLite Tables
 
@@ -225,8 +255,11 @@ HumanAnd/
 │   ├── relevance.md        # Prompt for message relevance classification (Haiku)
 │   ├── compaction.md       # Prompt for compressing ground truth when it exceeds word limit
 │   └── ground_truth_update.md  # Prompt for proposing ground truth edits
+├── agent.py                # ProjectAgent coordinator — one per project, holds all state
 ├── projects/
-│   └── new_human_and_model.txt   # Ground truth file (evolves over time)
+│   └── new_human_and_model/        # One folder per project
+│       ├── ground_truth.txt        # Goals, directory, decisions (evolves over time)
+│       └── messages.txt            # Timeline of important messages (decisions, blockers, milestones)
 ├── tests/
 │   ├── test_llm.py         # Tests for action classification (ROUTE/UPDATE/QUESTION/PASS)
 │   ├── test_bot.py         # Tests for message handling, threading, approval parsing
@@ -251,8 +284,9 @@ HumanAnd/
 - **`ground_truth.py`** — Reads and caches ground truth from `projects/`. Writes accepted updates back to the file with changelog entries. Uses channel-project mapping from SQLite.
 - **`db.py`** — SQLite setup. Stores thread history, channel-to-project mapping, misalignment log, and ground truth changelog.
 - **`dashboard.py`** — Reads from SQLite and serves a dashboard view — recent flags, ground truth history, per-channel stats. Exposed via slash command or a simple local web page.
+- **`agent.py`** — `ProjectAgent` class. One coordinator object per project that holds all state: ground truth, messages, history, config. All bot logic for a project flows through this object.
 - **`prompts/`** — Markdown files, one per prompt type. Loaded by `llm.py` at call time so you can edit them without restarting. Includes `nudge.md` which defines the bot's gentle tone when flagging misalignment.
-- **`projects/`** — Ground truth files. The bot reads from and writes to here.
+- **`projects/`** — One subfolder per project. Each contains `ground_truth.txt` (goals, directory, decisions) and `messages.txt` (chronological timeline of important messages — decisions, blockers, milestones, pivots, escalations — with timestamps, user IDs, and Slack permalinks for deep-linking and later visualization).
 
 ## Environment Variables
 

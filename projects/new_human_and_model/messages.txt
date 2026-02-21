@@ -1,0 +1,3 @@
+# Important Messages — new_human_and_model
+# Format: YYYY-MM-DD HH:MM | <@user_id> | slack_permalink | category | summary
+# Categories: decision, blocker, milestone, pivot, escalation
