@@ -46,3 +46,8 @@ uv run pytest
 ## Demo
 
 See `demo.md` for the end-to-end live demo script.
+
+## Config
+
+The app reads required env vars from a single place: `src/app/config.py`.
+Missing vars fail fast with a clear error.

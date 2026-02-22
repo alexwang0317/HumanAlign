@@ -100,6 +100,53 @@ def _propose_compaction(agent: ProjectAgent, channel_id: str, thread_ts: str, cl
     )
 
 
+def _accept_update(pending: dict, channel_id: str, user: str, client) -> None:
+    agent = _get_agent(pending["channel_name"])
+    needs_compaction = agent.apply_update(pending["update_text"], user)
+    agent.log_message(pending["user"], pending["permalink"], pending["category"], pending["update_text"])
+    update_reaction(pending["channel_name"], pending["event_id"], "approved", user)
+    client.chat_postMessage(
+        channel=channel_id,
+        text=":white_check_mark: Ground truth updated.",
+        thread_ts=pending["thread_ts"],
+    )
+    log.info("[%s] UPDATE accepted by %s", pending["channel_name"], user)
+    if needs_compaction:
+        _propose_compaction(agent, channel_id, pending["thread_ts"], client)
+
+
+def _reject_update(pending: dict, channel_id: str, user: str, client) -> None:
+    update_reaction(pending["channel_name"], pending["event_id"], "rejected", user)
+    client.chat_postMessage(
+        channel=channel_id,
+        text=":x: Change discarded.",
+        thread_ts=pending["thread_ts"],
+    )
+    log.info("[%s] UPDATE rejected by %s", pending["channel_name"], user)
+
+
+def _accept_nudge(pending: dict, channel_id: str, client) -> None:
+    if "event_id" in pending:
+        update_reaction(pending["channel_name"], pending["event_id"], "approved", "")
+    client.chat_postMessage(
+        channel=channel_id,
+        text=":white_check_mark: Thanks for the feedback — flagged as off-track.",
+        thread_ts=pending["thread_ts"],
+    )
+    log.info("[%s] NUDGE accepted", pending["channel_name"])
+
+
+def _reject_nudge(pending: dict, channel_id: str, client) -> None:
+    if "event_id" in pending:
+        update_reaction(pending["channel_name"], pending["event_id"], "rejected", "")
+    client.chat_postMessage(
+        channel=channel_id,
+        text=":ok_hand: Got it — seems like things are on track.",
+        thread_ts=pending["thread_ts"],
+    )
+    log.info("[%s] NUDGE dismissed", pending["channel_name"])
+
+
 # --- Three Slack event handlers: mentions, messages, reactions ---
 # Mentions = direct commands (@bot initialize, @bot role, @bot me, or questions)
 # Messages = passive classification of every channel message (the core alignment loop)
@@ -186,51 +233,26 @@ def _check_text_approval(event: dict, client, say) -> bool:
     user = event.get("user", "")
 
     if thread_ts in _pending_updates:
+        pending = _pending_updates.pop(thread_ts)
         if word in APPROVE_WORDS:
-            pending = _pending_updates.pop(thread_ts)
-            agent = _get_agent(pending["channel_name"])
-            needs_compaction = agent.apply_update(pending["update_text"], user)
-            agent.log_message(pending["user"], pending["permalink"], pending["category"], pending["update_text"])
-            update_reaction(pending["channel_name"], pending["event_id"], "approved", user)
-            client.chat_postMessage(
-                channel=channel_id,
-                text=":white_check_mark: Ground truth updated.",
-                thread_ts=pending["thread_ts"],
-            )
-            if needs_compaction:
-                _propose_compaction(agent, channel_id, pending["thread_ts"], client)
+            _accept_update(pending, channel_id, user, client)
             return True
         if word in REJECT_WORDS:
-            pending = _pending_updates.pop(thread_ts)
-            update_reaction(pending["channel_name"], pending["event_id"], "rejected", user)
-            client.chat_postMessage(
-                channel=channel_id,
-                text=":x: Change discarded.",
-                thread_ts=pending["thread_ts"],
-            )
+            _reject_update(pending, channel_id, user, client)
             return True
+        _pending_updates[thread_ts] = pending
+        return False
 
     if thread_ts in _pending_nudges:
+        pending = _pending_nudges.pop(thread_ts)
         if word in APPROVE_WORDS:
-            pending = _pending_nudges.pop(thread_ts)
-            if "event_id" in pending:
-                update_reaction(pending["channel_name"], pending["event_id"], "approved", "")
-            client.chat_postMessage(
-                channel=channel_id,
-                text=":white_check_mark: Thanks for the feedback — flagged as off-track.",
-                thread_ts=pending["thread_ts"],
-            )
+            _accept_nudge(pending, channel_id, client)
             return True
         if word in REJECT_WORDS:
-            pending = _pending_nudges.pop(thread_ts)
-            if "event_id" in pending:
-                update_reaction(pending["channel_name"], pending["event_id"], "rejected", "")
-            client.chat_postMessage(
-                channel=channel_id,
-                text=":ok_hand: Got it — seems like things are on track.",
-                thread_ts=pending["thread_ts"],
-            )
+            _reject_nudge(pending, channel_id, client)
             return True
+        _pending_nudges[thread_ts] = pending
+        return False
 
     return False
 
@@ -350,26 +372,13 @@ def handle_reaction(event: dict, client, say) -> None:
 
     if reaction in APPROVE_REACTIONS:
         del _pending_updates[msg_ts]
-        agent = _get_agent(pending["channel_name"])
-        needs_compaction = agent.apply_update(pending["update_text"], user)
-        agent.log_message(
-            pending["user"], pending["permalink"], pending["category"], pending["update_text"]
-        )
-        update_reaction(pending["channel_name"], pending["event_id"], "approved", user)
-        client.chat_postMessage(
-            channel=channel_id,
-            text=":white_check_mark: Ground truth updated.",
-            thread_ts=pending["thread_ts"],
-        )
-        log.info("[%s] UPDATE accepted by %s", pending["channel_name"], user)
-
-        if needs_compaction:
-            _propose_compaction(agent, channel_id, pending["thread_ts"], client)
+        _accept_update(pending, channel_id, user, client)
 
         # Validate directory user IDs against channel membership
         try:
             members_resp = client.conversations_members(channel=channel_id)
             channel_member_ids = members_resp.get("members", [])
+            agent = _get_agent(pending["channel_name"])
             missing = agent.validate_directory(channel_member_ids)
             if missing:
                 mentions = ", ".join(f"<@{uid}>" for uid in missing)
@@ -384,36 +393,13 @@ def handle_reaction(event: dict, client, say) -> None:
 
     elif reaction in REJECT_REACTIONS:
         del _pending_updates[msg_ts]
-        update_reaction(pending["channel_name"], pending["event_id"], "rejected", user)
-        client.chat_postMessage(
-            channel=channel_id,
-            text=":x: Change discarded.",
-            thread_ts=pending["thread_ts"],
-        )
-        log.info("[%s] UPDATE rejected by %s", pending["channel_name"], user)
+        _reject_update(pending, channel_id, user, client)
 
 
 def _handle_nudge_reaction(msg_ts: str, reaction: str, channel_id: str, client) -> None:
-    pending = _pending_nudges[msg_ts]
-
     if reaction in APPROVE_REACTIONS:
-        del _pending_nudges[msg_ts]
-        if "event_id" in pending:
-            update_reaction(pending["channel_name"], pending["event_id"], "approved", "")
-        client.chat_postMessage(
-            channel=channel_id,
-            text=":white_check_mark: Thanks for the feedback — flagged as off-track.",
-            thread_ts=pending["thread_ts"],
-        )
-        log.info("[%s] NUDGE accepted by reaction", pending["channel_name"])
-
+        pending = _pending_nudges.pop(msg_ts)
+        _accept_nudge(pending, channel_id, client)
     elif reaction in REJECT_REACTIONS:
-        del _pending_nudges[msg_ts]
-        if "event_id" in pending:
-            update_reaction(pending["channel_name"], pending["event_id"], "rejected", "")
-        client.chat_postMessage(
-            channel=channel_id,
-            text=":ok_hand: Got it — seems like things are on track.",
-            thread_ts=pending["thread_ts"],
-        )
-        log.info("[%s] NUDGE dismissed by reaction", pending["channel_name"])
+        pending = _pending_nudges.pop(msg_ts)
+        _reject_nudge(pending, channel_id, client)

@@ -22,37 +22,36 @@ def _extract_role(ground_truth: str, user_id: str) -> str:
     return "(no role set)"
 
 
-def scan_user_projects(user_id: str) -> list[dict]:
-    """Find all projects a user appears in and their role in each."""
-    results = []
+def _iter_project_files(filename: str):
+    """Yield (project_name, file_path) for each project that has the given file."""
     if not PROJECTS_DIR.exists():
-        return results
+        return
     for project_dir in sorted(PROJECTS_DIR.iterdir()):
         if not project_dir.is_dir():
             continue
-        gt_path = project_dir / "ground_truth.txt"
-        if not gt_path.exists():
-            continue
+        path = project_dir / filename
+        if path.exists():
+            yield project_dir.name, path
+
+
+def scan_user_projects(user_id: str) -> list[dict]:
+    """Find all projects a user appears in and their role in each."""
+    results = []
+    for project_name, gt_path in _iter_project_files("ground_truth.txt"):
         content = gt_path.read_text()
         if f"<@{user_id}>" in content:
             role = _extract_role(content, user_id)
-            results.append({"project": project_dir.name, "role": role})
+            results.append({"project": project_name, "role": role})
     return results
 
 
 def scan_user_activity(user_id: str, limit: int = 10) -> list[dict]:
     """Pull recent message timeline entries involving a user across all projects."""
     all_entries = []
-    if not PROJECTS_DIR.exists():
-        return all_entries
-    for project_dir in sorted(PROJECTS_DIR.iterdir()):
-        if not project_dir.is_dir():
-            continue
-        messages_path = project_dir / "messages.txt"
-        entries = parse_messages_txt(messages_path)
-        for entry in entries:
+    for project_name, messages_path in _iter_project_files("messages.txt"):
+        for entry in parse_messages_txt(messages_path):
             if entry["user"] == user_id:
-                entry["project"] = project_dir.name
+                entry["project"] = project_name
                 all_entries.append(entry)
     all_entries.sort(key=lambda x: x["timestamp"], reverse=True)
     return all_entries[:limit]
