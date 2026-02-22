@@ -14,6 +14,7 @@ PROJECTS_DIR = Path("projects")
 # When ground truth exceeds this limit, the bot triggers LLM-based compaction
 # to keep the document scannable. Directory and Core Objective are preserved.
 MAX_GROUND_TRUTH_WORDS = 1000
+DECISION_LOG_PLACEHOLDER = "(Bot will populate this as decisions are made)\n"
 
 
 class ProjectAgent:
@@ -55,7 +56,7 @@ class ProjectAgent:
             f"## Directory & Responsibilities\n"
             f"{directory}\n\n"
             f"## AI Decision Log\n"
-            f"(Bot will populate this as decisions are made)\n"
+            f"{DECISION_LOG_PLACEHOLDER}"
         )
 
         self._write_file("ground_truth.txt", ground_truth)
@@ -105,9 +106,8 @@ class ProjectAgent:
         path = self.project_dir / "ground_truth.txt"
         content = path.read_text() if path.exists() else ""
 
-        placeholder = "(Bot will populate this as decisions are made)\n"
-        if placeholder in content:
-            content = content.replace(placeholder, entry + "\n")
+        if DECISION_LOG_PLACEHOLDER in content:
+            content = content.replace(DECISION_LOG_PLACEHOLDER, entry + "\n")
         else:
             content = content.rstrip() + "\n" + entry + "\n"
 

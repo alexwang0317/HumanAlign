@@ -63,9 +63,8 @@ def parse_github_map(ground_truth: str) -> dict[str, dict]:
     return mapping
 
 
-def check_pr(pr: dict, repo: str, agent: ProjectAgent, project_name: str = "") -> dict | None:
+def check_pr(pr: dict, repo: str, agent: ProjectAgent) -> dict | None:
     """Check a single PR for alignment. Returns nudge dict or None."""
-    project_name = project_name or repo.split("/")[-1]
     pr_number = pr["number"]
     pr_title = pr["title"]
     gh_username = pr["user"]["login"].lower()
@@ -130,7 +129,7 @@ def poll_once(repo: str, slack_client, agents: dict[str, ProjectAgent]) -> None:
             continue
         _seen_prs.add(pr["number"])
 
-        nudge = check_pr(pr, repo, agent, project_name)
+        nudge = check_pr(pr, repo, agent)
         if not nudge:
             continue
 

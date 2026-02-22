@@ -79,16 +79,10 @@ def build_person_summary(user_id: str, pending_updates: dict | None = None, pend
             link = f"<{entry['permalink']}|link>" if entry.get("permalink") else ""
             lines.append(f"- {entry['timestamp']} | {entry['project']} | {entry['category']} | {entry['summary']} {link}")
 
-    # Check pending items
-    pending_count = 0
-    if pending_updates:
-        for pending in pending_updates.values():
-            if pending.get("user") == user_id:
-                pending_count += 1
-    if pending_nudges:
-        for pending in pending_nudges.values():
-            if pending.get("user") == user_id:
-                pending_count += 1
+    pending_count = (
+        sum(1 for p in (pending_updates or {}).values() if p.get("user") == user_id)
+        + sum(1 for p in (pending_nudges or {}).values() if p.get("user") == user_id)
+    )
     if pending_count:
         lines.append(f"\n*Pending*\n- {pending_count} item(s) awaiting review")
 

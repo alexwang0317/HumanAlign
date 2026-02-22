@@ -9,6 +9,7 @@ log = logging.getLogger(__name__)
 from src.services.project_service import ProjectAgent
 from src.services.dashboard_service import deploy
 from src.services.people_service import build_person_summary
+from src.constants import APPROVE_REACTIONS, APPROVE_WORDS, REJECT_REACTIONS, REJECT_WORDS
 from src.stores.db import log_event, update_reaction
 from src.utils.history import fetch_context
 
@@ -77,6 +78,11 @@ def _parse_category(result: str) -> tuple[str, str]:
         content = match.group(3)
         return f"{action}: {content}", category
     return result, "general"
+
+
+def _action_content(result: str, action: str) -> str:
+    """Extract content after 'ACTION:' prefix, e.g. 'UPDATE: foo' -> 'foo'."""
+    return result[len(action) + 1:].strip()
 
 
 def _format_diff(current: str, addition: str) -> str:
@@ -283,19 +289,19 @@ def handle_message(event: dict, client, say) -> None:
     permalink = _build_permalink(channel_id, thread_ts)
 
     if result.startswith("ROUTE:"):
-        route_data = result.replace("ROUTE:", "").strip().split("|", 1)
+        route_content = _action_content(result, "ROUTE")
+        route_data = route_content.split("|", 1)
         target_user = route_data[0].strip()
         context = route_data[1].strip() if len(route_data) > 1 else "could use your help here"
         say(
             f"Hey {target_user}, <@{user}> {context} Could you jump in here?",
             thread_ts=thread_ts,
         )
-        route_content = result.replace("ROUTE:", "").strip()
         agent.log_message(user, permalink, category, route_content)
         log_event(channel_name, "ROUTE", user, category, route_content, permalink)
 
     elif result.startswith("UPDATE:"):
-        update_text = result.replace("UPDATE:", "").strip()
+        update_text = _action_content(result, "UPDATE")
         diff = _format_diff(agent.ground_truth, update_text)
         response = say(
             f":memo: *Proposed ground truth change:*\n\n{diff}\n\nReact :white_check_mark: to accept or :x: to reject.",
@@ -314,7 +320,7 @@ def handle_message(event: dict, client, say) -> None:
         }
 
     elif result.startswith("MISALIGN:"):
-        misalign_text = result.replace("MISALIGN:", "").strip()
+        misalign_text = _action_content(result, "MISALIGN")
         warning = Path("prompts/misalign.md").read_text().format(misalign_content=misalign_text)
         response = say(warning, thread_ts=thread_ts)
         agent.log_message(user, permalink, category, misalign_text)
@@ -328,7 +334,7 @@ def handle_message(event: dict, client, say) -> None:
         }
 
     elif result.startswith("QUESTION:"):
-        question_text = result.replace("QUESTION:", "").strip()
+        question_text = _action_content(result, "QUESTION")
         nudge = Path("prompts/nudge.md").read_text().format(nudge_content=question_text)
         response = say(nudge, thread_ts=thread_ts)
         agent.log_message(user, permalink, category, question_text)
@@ -346,10 +352,6 @@ def handle_message(event: dict, client, say) -> None:
 
 # Two approval mechanisms: emoji reactions and text replies in-thread.
 # Both are intentionally loose — any reasonable affirmative/negative counts.
-APPROVE_REACTIONS = {"white_check_mark", "+1", "thumbsup"}
-REJECT_REACTIONS = {"x", "-1", "thumbsdown"}
-APPROVE_WORDS = {"y", "yes", "yeah", "sure", "approve", "approved", "ok"}
-REJECT_WORDS = {"n", "no", "nah", "reject", "rejected", "nope"}
 
 
 def handle_reaction(event: dict, client, say) -> None:
