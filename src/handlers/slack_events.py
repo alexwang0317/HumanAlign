@@ -8,11 +8,15 @@ log = logging.getLogger(__name__)
 
 from src.services.project_service import ProjectAgent
 from src.services.dashboard_service import deploy
+from src.services.people_service import build_person_summary
 from src.stores.db import log_event, update_reaction
 from src.utils.history import fetch_context
 
+# One ProjectAgent per channel — lazy-loaded on first message, cached for the session
 _agents: dict[str, ProjectAgent] = {}
+# Keyed by Slack message timestamp — tracks proposed ground truth changes awaiting Y/N
 _pending_updates: dict[str, dict] = {}
+# Keyed by Slack message timestamp — tracks nudges (MISALIGN/QUESTION) awaiting feedback
 _pending_nudges: dict[str, dict] = {}
 
 
@@ -51,8 +55,8 @@ def _fetch_channel_members(client, channel_id: str) -> list[dict]:
 
 
 def _strip_mention(text: str) -> str:
-    """Remove the @bot mention from the message text."""
-    return re.sub(r"<@[A-Z0-9]+>\s*", "", text).strip()
+    """Remove the first @mention (the bot) from the message text."""
+    return re.sub(r"<@[A-Z0-9]+>\s*", "", text, count=1).strip()
 
 
 def _build_permalink(channel_id: str, ts: str) -> str:
@@ -96,6 +100,11 @@ def _propose_compaction(agent: ProjectAgent, channel_id: str, thread_ts: str, cl
     )
 
 
+# --- Three Slack event handlers: mentions, messages, reactions ---
+# Mentions = direct commands (@bot initialize, @bot role, @bot me, or questions)
+# Messages = passive classification of every channel message (the core alignment loop)
+# Reactions = emoji-based approval/rejection for pending updates and nudges
+
 def register_handlers(app: App) -> None:
     app.event("app_mention")(handle_app_mention)
     app.event("message")(handle_message)
@@ -132,6 +141,24 @@ def handle_app_mention(event: dict, client, say) -> None:
         except Exception as e:
             log.error("Dashboard deploy failed: %s", e)
             say(f":x: Dashboard deploy failed: {e}", thread_ts=thread_ts)
+        return
+
+    if user_message.lower().strip() == "me":
+        log.info("[%s] Person lookup: %s looking up themselves", channel_name, user_id)
+        summary = build_person_summary(user_id, _pending_updates, _pending_nudges)
+        say(summary, thread_ts=thread_ts)
+        return
+
+    # Check if message is just a user mention — lookup that person
+    user_mention = re.match(r"^<@(U[A-Z0-9]+)>$", user_message.strip())
+    if user_mention:
+        target_id = user_mention.group(1)
+        log.info("[%s] Person lookup: %s looking up %s", channel_name, user_id, target_id)
+        summary = build_person_summary(target_id, _pending_updates, _pending_nudges)
+        say(summary, thread_ts=thread_ts)
+        return
+
+    if not user_message:
         return
 
     agent = _get_agent(channel_name)
@@ -204,9 +231,11 @@ def _check_text_approval(event: dict, client, say) -> bool:
 
 
 def handle_message(event: dict, client, say) -> None:
+    # Ignore bot messages to prevent self-referencing loops
     if event.get("bot_id") or event.get("subtype"):
         return
 
+    # Check if this is a text-based Y/N reply to a pending update before classifying
     if _check_text_approval(event, client, say):
         return
 
@@ -288,6 +317,8 @@ def handle_message(event: dict, client, say) -> None:
     # PASS — do nothing
 
 
+# Two approval mechanisms: emoji reactions and text replies in-thread.
+# Both are intentionally loose — any reasonable affirmative/negative counts.
 APPROVE_REACTIONS = {"white_check_mark", "+1", "thumbsup"}
 REJECT_REACTIONS = {"x", "-1", "thumbsdown"}
 APPROVE_WORDS = {"y", "yes", "yeah", "sure", "approve", "approved", "ok"}

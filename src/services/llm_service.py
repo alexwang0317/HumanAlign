@@ -3,6 +3,8 @@ from pathlib import Path
 
 import anthropic
 
+# Sonnet for all calls — fast enough for classification, smart enough for nuance.
+# Prompts are loaded from disk at call time so you can edit them without restarting.
 MODEL = "claude-sonnet-4-6"
 PROMPTS_DIR = Path("prompts")
 
@@ -19,6 +21,9 @@ def _extract_text(response: anthropic.types.Message) -> str:
     # pyrefly: ignore[missing-attribute]
     return response.content[0].text.strip()  # pyrefly: ignore
 
+
+# Max tokens are tuned per function: 256 for single-line classification,
+# 128 for binary PASS/NUDGE, 1024 for free-form responses, 2048 for document rewriting.
 
 def classify_message(ground_truth: str, user: str, message: str, history: str = "") -> str:
     system_prompt = _load_prompt("classify.md").format(

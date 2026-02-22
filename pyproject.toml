@@ -18,3 +18,7 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[tool.pyrefly]
+project_includes = ["src/**", "tests/**"]
+search_path = ["."]

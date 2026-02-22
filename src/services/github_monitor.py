@@ -12,7 +12,9 @@ from src.services.llm_service import classify_pr
 
 log = logging.getLogger(__name__)
 
+# Poll every 60s by default. GitHub API rate limit is 5,000/hr — this uses ~10/min, well within bounds.
 POLL_INTERVAL = int(os.environ.get("GITHUB_POLL_INTERVAL", "60"))
+# In-memory set to avoid re-checking PRs within a session. Resets on restart (by design — seeding handles it).
 _seen_prs: set[int] = set()
 
 
@@ -39,7 +41,11 @@ def fetch_pr_commits(repo: str, pr_number: int) -> list[str]:
 
 
 def parse_github_map(ground_truth: str) -> dict[str, dict]:
-    """Parse Directory entries for 'github: username' to build github_user -> info map."""
+    """Parse Directory entries for 'github: username' to build github_user -> info map.
+
+    Expects lines like: * **Name** (<@SLACK_ID>) — Role description. github: ghusername
+    This is the bridge between GitHub identities and Slack/role identities.
+    """
     mapping: dict[str, dict] = {}
     for line in ground_truth.splitlines():
         gh_match = re.search(r"github:\s*(\S+)", line, re.IGNORECASE)
@@ -110,9 +116,10 @@ def _resolve_channel_id(client, channel_name: str) -> str | None:
     return None
 
 
-def poll_once(repo: str, slack_client, agents: dict[str, ProjectAgent]) -> None:
+def poll_once(repo: str, slack_client, agents: dict[str, ProjectAgent], project_name: str = "") -> None:
     """Single poll iteration: fetch PRs, check new ones, post nudges."""
-    project_name = repo.split("/")[-1]
+    # Project name can differ from repo name (e.g. repo "HumanAlign" -> project "new_human_and_model")
+    project_name = project_name or repo.split("/")[-1]
     agent = agents.get(project_name)
     if not agent:
         agent = ProjectAgent(project_name)
@@ -139,11 +146,12 @@ def poll_once(repo: str, slack_client, agents: dict[str, ProjectAgent]) -> None:
         log.info("PR nudge posted for PR #%d", nudge["pr_number"])
 
 
-def start_polling(repo: str, slack_client, agents: dict[str, ProjectAgent]) -> threading.Thread:
+def start_polling(repo: str, slack_client, agents: dict[str, ProjectAgent], project_name: str = "") -> threading.Thread:
     """Start background polling thread. Returns the thread."""
     def _loop():
         log.info("GitHub PR monitor started for %s (every %ds)", repo, POLL_INTERVAL)
-        # Seed seen PRs on first run to avoid flooding
+        # Seed existing PRs on first run so we don't flood Slack with nudges
+        # for PRs that were opened before the bot started
         try:
             for pr in fetch_open_prs(repo):
                 _seen_prs.add(pr["number"])
@@ -154,7 +162,7 @@ def start_polling(repo: str, slack_client, agents: dict[str, ProjectAgent]) -> t
         while True:
             time.sleep(POLL_INTERVAL)
             try:
-                poll_once(repo, slack_client, agents)
+                poll_once(repo, slack_client, agents, project_name)
             except Exception as e:
                 log.error("GitHub poll error: %s", e)
 

@@ -4,6 +4,8 @@ from pathlib import Path
 
 PROJECTS_DIR = Path("projects")
 
+# One SQLite DB per project — keeps projects isolated and avoids cross-project queries.
+# Connections are pooled for the process lifetime since SQLite handles are lightweight.
 _connections: dict[str, sqlite3.Connection] = {}
 
 CREATE_EVENTS = """

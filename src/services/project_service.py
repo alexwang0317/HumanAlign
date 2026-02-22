@@ -11,6 +11,8 @@ from src.services.llm_service import classify_message, compact_ground_truth, res
 log = logging.getLogger(__name__)
 
 PROJECTS_DIR = Path("projects")
+# When ground truth exceeds this limit, the bot triggers LLM-based compaction
+# to keep the document scannable. Directory and Core Objective are preserved.
 MAX_GROUND_TRUTH_WORDS = 1000
 
 
@@ -136,7 +138,11 @@ class ProjectAgent:
         self.messages = self._load_file("messages.txt")
 
     def _git_commit(self, summary: str, approved_by: str) -> None:
-        """Commit ground truth to a project-specific branch via a temporary worktree."""
+        """Commit ground truth to a project-specific branch via a temporary worktree.
+
+        Uses a worktree so we never touch the working tree — avoids conflicts
+        with whatever the developer has checked out locally.
+        """
         branch = f"project/{self.name}"
         gt_path = self.project_dir / "ground_truth.txt"
         worktree_dir = None
